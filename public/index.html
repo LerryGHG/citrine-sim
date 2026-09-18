@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CitrineSim</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --border: #2a2f3a;
+    --text: #e6e9ef;
+    --muted: #8b93a3;
+    --accent: #4f8cff;
+    --green: #35c766;
+    --yellow: #e0b23a;
+    --red: #e0503a;
+    --blue: #3a8ee0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, Segoe UI, Roboto, sans-serif;
+    padding: 20px;
+  }
+  h1 { font-size: 18px; margin: 0 0 16px; display: flex; align-items: center; gap: 10px; }
+  h1 .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--red); }
+  h1 .dot.on { background: var(--green); }
+  .grid {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 16px;
+    max-width: 1200px;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .panel h2 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    margin: 0 0 12px;
+  }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+  input[type=text], input[type=number], select, textarea {
+    width: 100%;
+    background: #0d0f14;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 13px;
+    font-family: inherit;
+  }
+  textarea { font-family: monospace; min-height: 70px; }
+  button {
+    background: #232833;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    margin-top: 10px;
+    margin-right: 6px;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.danger { background: var(--red); border-color: var(--red); color: #fff; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .status-badge {
+    display: inline-block;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 14px;
+  }
+  .status-Available { background: #1c3a26; color: var(--green); }
+  .status-Preparing { background: #3a331c; color: var(--yellow); }
+  .status-Charging { background: #1c2f3a; color: var(--blue); }
+  .status-SuspendedEV { background: #3a2a1c; color: var(--yellow); }
+  .status-Finishing { background: #2a1c3a; color: #b98ee0; }
+  .status-Unavailable { background: #3a1c1c; color: var(--red); }
+  .kv { display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0; border-bottom: 1px solid var(--border); }
+  .kv span:first-child { color: var(--muted); }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .row label { margin: 0; flex-shrink: 0; }
+  input[type=range] { flex: 1; }
+  .log {
+    height: 480px;
+    overflow-y: auto;
+    background: #0d0f14;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px;
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: 12px;
+  }
+  .log-entry { padding: 3px 0; border-bottom: 1px solid #1a1d24; white-space: pre-wrap; word-break: break-all; }
+  .log-out { color: #7ec4ff; }
+  .log-in { color: #8bdc9b; }
+  .log-ts { color: var(--muted); margin-right: 8px; }
+  .toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .switch {
+    width: 40px; height: 22px; background: #333; border-radius: 12px; position: relative; transition: 0.15s;
+  }
+  .switch.on { background: var(--green); }
+  .switch .knob {
+    width: 18px; height: 18px; background: #fff; border-radius: 50%;
+    position: absolute; top: 2px; left: 2px; transition: 0.15s;
+  }
+  .switch.on .knob { left: 20px; }
+</style>
+</head>
+<body>
+
+<h1><span class="dot" id="connDot"></span> CitrineSim — OCPP 1.6 Charge Point Simulator</h1>
+
+<div class="grid">
+  <div>
+    <div class="panel" id="connectPanel">
+      <h2>Connection</h2>
+      <label>Central System URL</label>
+      <input type="text" id="csUrl" value="ws://10.40.2.50:8081" placeholder="ws://host:8081">
+      <label>Station ID</label>
+      <input type="text" id="stationId" value="CITRINE_SIM_01">
+      <button class="primary" id="btnConnect">Connect</button>
+      <button class="danger" id="btnDisconnect" disabled>Disconnect</button>
+    </div>
+
+    <div class="panel">
+      <h2>Session</h2>
+      <div class="kv"><span>Status</span><span id="statusBadgeWrap"><span class="status-badge status-Unavailable" id="statusBadge">Unavailable</span></span></div>
+      <div class="kv"><span>Transaction ID</span><span id="txId">—</span></div>
+      <div class="kv"><span>Energy delivered</span><span id="kwh">0.00 kWh</span></div>
+
+      <label style="margin-top:14px">Cable</label>
+      <div class="toggle" id="cableToggle">
+        <div class="switch" id="cableSwitch"><div class="knob"></div></div>
+        <span id="cableLabel">Unplugged</span>
+      </div>
+
+      <label>RFID Tag</label>
+      <input type="text" id="rfidTag" value="RFID-CARD-01" placeholder="idTag">
+      <button class="primary" id="btnPresent">Present Tag</button>
+
+      <label style="margin-top:14px">Car ready to charge</label>
+      <div class="toggle" id="carReadyToggle">
+        <div class="switch on" id="carReadySwitch"><div class="knob"></div></div>
+        <span id="carReadyLabel">Ready</span>
+      </div>
+
+      <label>Current draw (A)</label>
+      <div class="row">
+        <input type="range" id="currentAmps" min="0" max="32" value="16">
+        <span id="currentAmpsVal">16A</span>
+      </div>
+
+      <button class="danger" id="btnStop" style="margin-top:16px">Stop / Tap Out</button>
+    </div>
+
+    <div class="panel">
+      <h2>Manual Command</h2>
+      <label>Action</label>
+      <select id="manualAction">
+        <option>Authorize</option>
+        <option>Heartbeat</option>
+        <option>StatusNotification</option>
+        <option>DataTransfer</option>
+        <option>MeterValues</option>
+        <option>SecurityEventNotification</option>
+      </select>
+      <label>Payload (JSON)</label>
+      <textarea id="manualPayload">{"idTag": "RFID-CARD-01"}</textarea>
+      <button id="btnManualSend">Send</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Live OCPP Log</h2>
+    <div class="log" id="log"></div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+async function api(path, body) {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body || {}),
+  });
+  return res.json();
+}
+
+function renderState(state) {
+  $("connDot").classList.toggle("on", state.connected);
+  $("btnConnect").disabled = state.connected;
+  $("btnDisconnect").disabled = !state.connected;
+
+  const badge = $("statusBadge");
+  badge.textContent = state.connectorStatus;
+  badge.className = "status-badge status-" + state.connectorStatus;
+
+  $("txId").textContent = state.transactionId || "—";
+  $("kwh").textContent = (state.meterWh / 1000).toFixed(2) + " kWh";
+
+  $("cableSwitch").classList.toggle("on", state.cablePlugged);
+  $("cableLabel").textContent = state.cablePlugged ? "Plugged in" : "Unplugged";
+
+  $("carReadySwitch").classList.toggle("on", state.carReady);
+  $("carReadyLabel").textContent = state.carReady ? "Ready" : "Suspended (not drawing)";
+
+  $("currentAmps").value = state.currentDrawAmps;
+  $("currentAmpsVal").textContent = state.currentDrawAmps + "A";
+}
+
+function appendLog(entry) {
+  const div = document.createElement("div");
+  div.className = "log-entry log-" + entry.dir;
+  const arrow = entry.dir === "out" ? "→" : "←";
+  const time = new Date(entry.ts).toLocaleTimeString();
+  div.innerHTML = `<span class="log-ts">${time}</span>${arrow} <b>${entry.action}</b> ${JSON.stringify(entry.payload)}`;
+  const log = $("log");
+  const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+  log.appendChild(div);
+  if (atBottom) log.scrollTop = log.scrollHeight;
+}
+
+// Initial load
+fetch("/api/state").then(r => r.json()).then(({ state, log }) => {
+  renderState(state);
+  log.forEach(appendLog);
+});
+
+const es = new EventSource("/api/events");
+es.onmessage = (ev) => {
+  const msg = JSON.parse(ev.data);
+  if (msg.type === "state") renderState(msg.state);
+  if (msg.type === "log") appendLog(msg.entry);
+};
+
+$("btnConnect").onclick = () => api("/api/connect", {
+  centralSystemUrl: $("csUrl").value,
+  stationId: $("stationId").value,
+}).then(r => { if (!r.ok) alert(r.error); });
+
+$("btnDisconnect").onclick = () => api("/api/disconnect");
+
+$("cableToggle").onclick = async () => {
+  const state = await fetch("/api/state").then(r => r.json()).then(d => d.state);
+  await api("/api/cable", { plugged: !state.cablePlugged });
+};
+
+$("btnPresent").onclick = () => api("/api/rfid", { idTag: $("rfidTag").value })
+  .then(r => { if (!r.ok) alert(r.error); });
+
+$("carReadyToggle").onclick = async () => {
+  const state = await fetch("/api/state").then(r => r.json()).then(d => d.state);
+  await api("/api/car-ready", { ready: !state.carReady });
+};
+
+$("currentAmps").oninput = (e) => {
+  $("currentAmpsVal").textContent = e.target.value + "A";
+};
+$("currentAmps").onchange = (e) => api("/api/current", { amps: e.target.value });
+
+$("btnStop").onclick = () => api("/api/stop");
+
+$("btnManualSend").onclick = () => {
+  let payload;
+  try {
+    payload = JSON.parse($("manualPayload").value);
+  } catch (e) {
+    alert("Invalid JSON payload");
+    return;
+  }
+  api("/api/manual", { action: $("manualAction").value, payload })
+    .then(r => { if (!r.ok) alert(r.error); });
+};
+</script>
+</body>
+</html>

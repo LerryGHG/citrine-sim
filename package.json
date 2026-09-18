@@ -1,0 +1,14 @@
+{
+  "name": "citrine-sim",
+  "version": "1.0.0",
+  "description": "Purpose-built OCPP 1.6 charge point simulator for CitrineOS testing",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "ws": "^8.18.0"
+  }
+}
