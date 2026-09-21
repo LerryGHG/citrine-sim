@@ -27,6 +27,9 @@ const state = {
   meterWh: 0,
   meterIntervalSeconds: 10,
   sessionStartedAt: null,
+  socStartPercent: 20, // battery level when a session starts
+  batteryKwh: 40, // usable battery size, drives how fast the level rises
+  socPercent: 20,
 };
 
 let ws = null;
@@ -301,6 +304,7 @@ async function tryStartTransaction() {
 
   state.transactionId = txId;
   state.sessionStartedAt = Date.now();
+  state.socPercent = state.socStartPercent;
   await setConnectorStatus(state.carReady ? "Charging" : "SuspendedEV");
   startMeterLoop();
   return { started: true, status, transactionId: txId };
@@ -342,6 +346,10 @@ function startMeterLoop() {
     if (!state.transactionId) return;
     const whPerTick = (wattsDrawn * state.meterIntervalSeconds) / 3600;
     state.meterWh += whPerTick;
+    state.socPercent = Math.min(
+      100,
+      state.socPercent + (whPerTick / (state.batteryKwh * 1000)) * 100,
+    );
     await sendCall("MeterValues", {
       connectorId: 1,
       transactionId: state.transactionId,
@@ -358,6 +366,12 @@ function startMeterLoop() {
               value: String(state.currentDrawAmps),
               measurand: "Current.Import",
               unit: "A",
+            },
+            {
+              value: String(Math.round(state.socPercent * 10) / 10),
+              measurand: "SoC",
+              unit: "Percent",
+              location: "EV",
             },
           ],
         },
@@ -424,6 +438,18 @@ app.post("/api/car-ready", async (req, res) => {
 
 app.post("/api/current", (req, res) => {
   state.currentDrawAmps = Number(req.body.amps) || 0;
+  res.json({ ok: true, state });
+});
+
+app.post("/api/battery", (req, res) => {
+  const startPercent = Number(req.body.startPercent);
+  const batteryKwh = Number(req.body.batteryKwh);
+  if (Number.isFinite(startPercent)) {
+    state.socStartPercent = Math.min(100, Math.max(0, startPercent));
+    // Only an idle car can have its level reset; a running session keeps counting up.
+    if (!state.transactionId) state.socPercent = state.socStartPercent;
+  }
+  if (Number.isFinite(batteryKwh) && batteryKwh > 0) state.batteryKwh = batteryKwh;
   res.json({ ok: true, state });
 });
 

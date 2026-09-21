@@ -146,6 +146,7 @@
       <div class="kv"><span>Status</span><span id="statusBadgeWrap"><span class="status-badge status-Unavailable" id="statusBadge">Unavailable</span></span></div>
       <div class="kv"><span>Transaction ID</span><span id="txId">—</span></div>
       <div class="kv"><span>Energy delivered</span><span id="kwh">0.00 kWh</span></div>
+      <div class="kv"><span>Battery</span><span id="soc">—</span></div>
 
       <label style="margin-top:14px">Cable</label>
       <div class="toggle" id="cableToggle">
@@ -167,6 +168,12 @@
       <div class="row">
         <input type="range" id="currentAmps" min="0" max="32" value="16">
         <span id="currentAmpsVal">16A</span>
+      </div>
+
+      <label>Battery: start level (%) / size (kWh)</label>
+      <div class="row">
+        <input type="number" id="socStart" min="0" max="100" step="1" value="20">
+        <input type="number" id="batteryKwh" min="1" step="1" value="40">
       </div>
 
       <button class="danger" id="btnStop" style="margin-top:16px">Stop / Tap Out</button>
@@ -227,6 +234,11 @@ function renderState(state) {
 
   $("currentAmps").value = state.currentDrawAmps;
   $("currentAmpsVal").textContent = state.currentDrawAmps + "A";
+
+  $("soc").textContent = state.socPercent.toFixed(1) + " %";
+  // Don't overwrite a field while it's being typed in.
+  if (document.activeElement !== $("socStart")) $("socStart").value = state.socStartPercent;
+  if (document.activeElement !== $("batteryKwh")) $("batteryKwh").value = state.batteryKwh;
 }
 
 function appendLog(entry) {
@@ -278,6 +290,13 @@ $("currentAmps").oninput = (e) => {
   $("currentAmpsVal").textContent = e.target.value + "A";
 };
 $("currentAmps").onchange = (e) => api("/api/current", { amps: e.target.value });
+
+const applyBattery = () => api("/api/battery", {
+  startPercent: $("socStart").value,
+  batteryKwh: $("batteryKwh").value,
+});
+$("socStart").onchange = applyBattery;
+$("batteryKwh").onchange = applyBattery;
 
 $("btnStop").onclick = () => api("/api/stop");
 
